@@ -17,6 +17,7 @@ pytest-cov = "^5.0.0"
 httpx = "^0.27.0"
 taskipy = "^1.13.0"
 fastapi = "^0.111.0"
+ipdb = "^0.13.13"
 
 [tool.ruff]
 line-length = 79
@@ -42,7 +43,8 @@ lint = 'ruff check . ; ruff check . --diff'
 
 [tool.pytest.ini_options]
 pythonpath = "."
-addopts = '-p no:warnings'
+addopts = "--pdbcls=IPython.terminal.debugger:Pdb"
+# addopts = '-p no:warnings --pdbcls=IPython.terminal.debugger:Pdb'
 
 [build-system]
 requires = ["poetry-core"]
