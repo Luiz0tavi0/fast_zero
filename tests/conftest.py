@@ -1,18 +1,53 @@
-
+import factory
+import factory.fuzzy
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import StaticPool, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from testcontainers.postgres import PostgresContainer
 
 from fast_zero.app import app
 from fast_zero.database import get_session
-from fast_zero.models import User, table_registry
+from fast_zero.models import Todo, TodoState, User, table_registry
 from fast_zero.security import get_password_hash
 
-# from fast_zero.models import User
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    username = factory.sequence(lambda n: f'test{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.username}@test.com')
+    password = factory.LazyAttribute(lambda obj: f'{obj.username}+senha123')
 
 
-@pytest.fixture()
+class TodoFactory(factory.Factory):
+    class Meta:
+        model = Todo
+
+    title = factory.Faker('text')
+    description = factory.Faker('text')
+    state = factory.fuzzy.FuzzyChoice(TodoState)
+    user_id = 1
+
+
+@pytest.fixture(scope='session')
+def engine():
+    with PostgresContainer('postgres:16', driver='psycopg') as postgres:
+        _engine = create_engine(postgres.get_connection_url())  # type: ignore
+        with _engine.begin():
+            yield _engine
+
+
+@pytest.fixture
+def session(engine):
+    table_registry.metadata.create_all(engine)
+    with Session(engine) as sess:
+        yield sess
+    table_registry.metadata.drop_all(engine)
+
+
+@pytest.fixture
 def client(session):
     def get_session_override():
         return session
@@ -25,25 +60,11 @@ def client(session):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
-def session():
-    engine = create_engine(
-        'sqlite:///:memory:',
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool,
-    )
-    table_registry.metadata.create_all(engine)
-    with Session(engine) as sess:
-        yield sess
-    table_registry.metadata.drop_all(engine)
-
-
-@pytest.fixture()
+@pytest.fixture
 def user(session):
     pwd = 'testtest'
-    user = User(
-        username='test', email='test@test.com', password=get_password_hash(pwd)
-    )
+    user = UserFactory(password=get_password_hash(pwd))
+
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -51,7 +72,17 @@ def user(session):
     return user
 
 
-@pytest.fixture()
+@pytest.fixture
+def other_user(session):
+    user = UserFactory()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    return user
+
+
+@pytest.fixture
 def token(client: TestClient, user: User):
     response = client.post(
         url='/auth/token',

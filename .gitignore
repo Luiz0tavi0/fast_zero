@@ -10,8 +10,6 @@ __pycache__/
 # C extensions
 *.so
 
-.vscode/
-
 # Distribution / packaging
 .Python
 build/
@@ -179,4 +177,3 @@ pyrightconfig.json
 
 # Generated using ignr.py - github.com/Antrikshy/ignr.py
 
-database.db

@@ -60,7 +60,7 @@ def udpate_user(
     user_id: int,
     user: UserSchema,
     session: T_Session,
-    current_user: T_CurrentUser
+    current_user: T_CurrentUser,
 ):
     if current_user.id != user_id:
         raise HTTPException(
@@ -78,17 +78,12 @@ def udpate_user(
 
 
 @router.delete('/{user_id}', response_model=Message)
-def delete_user(
-    user_id: int,
-    session: T_Session,
-    current_user: T_CurrentUser
-):
+def delete_user(user_id: int, session: T_Session, current_user: T_CurrentUser):
     # import ipdb; ipdb.set_trace()  # noqa: E702, I001, I001, PLC0415
 
     if current_user.id != user_id:
         raise HTTPException(
-            status_code=HTTPStatus.FORBIDDEN,
-            detail='Not enough permission'
+            status_code=HTTPStatus.FORBIDDEN, detail='Not enough permission'
         )
     session.delete(current_user)
     session.commit()

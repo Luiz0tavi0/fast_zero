@@ -4,6 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from fast_zero.models import User
 from fast_zero.routers.users import create_user
 from fast_zero.schemas import UserPublic, UserSchema
 
@@ -30,11 +31,18 @@ def test_read_users(client: TestClient):
     assert response.json() == {'users': []}
 
 
-def test_read_users_with_user(client: TestClient, user):
-    user_schema = UserPublic.model_validate(user).model_dump()
+def test_read_users_with_user(
+    client: TestClient, user: User, other_user: User
+):
+    user_schemas = list(
+        map(
+            lambda u: UserPublic.model_validate(u).model_dump(),
+            [user, other_user],
+        )
+    )
     response = client.get('/users/')
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': [user_schema]}
+    assert response.json() == {'users': user_schemas}
 
 
 def test_update_user(client: TestClient, user, token: str):
@@ -55,6 +63,21 @@ def test_update_user(client: TestClient, user, token: str):
     }
 
 
+def test_update_wrong_user(client: TestClient, other_user: User, token: str):
+    response = client.put(
+        url=f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'password': 'aBx_123458791',
+            'id': 1,
+            'email': 'luiz2@gmail.com',
+            'username': 'teste_user_name_2',
+        },
+    )
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permission'}
+
+
 def test_delete_user(client: TestClient, user, token: str):
     response = client.delete(
         url=f'/users/{user.id}', headers={'Authorization': f'Bearer {token}'}
@@ -63,10 +86,10 @@ def test_delete_user(client: TestClient, user, token: str):
     assert response.json() == {'message': 'User deleted'}
 
 
-def test_delete_wrong_user(client: TestClient, user, token: str):
+def test_delete_wrong_user(client: TestClient, other_user: User, token: str):
     response = client.delete(
-        url=f'/users/{user.id + 1}',
-        headers={'Authorization': f'Bearer {token}'}
+        url=f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN
@@ -131,3 +154,13 @@ def test_get_user_by_id_deve_retornar_user_public(client: TestClient, user):
     assert response.status_code == HTTPStatus.OK
 
     assert response.json() == user_schema
+
+
+def test_get_user_by_id_deve_retornar_user_not_found(
+    client: TestClient, user: User
+):
+    response = client.get('/users/0')
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+    assert response.json()['detail'] == 'User not found'
